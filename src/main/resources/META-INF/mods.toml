@@ -1,0 +1,31 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+[[mods]]
+modId="ninjawars"
+version="1.0.0"
+displayName="Naruto Ninja Wars"
+authors="Ninja Wars contributors"
+description='''Guerras ninja entre as 5 grandes vilas: guarnições, invasões, missões e ranks. Addon do Narutoto.'''
+
+[[dependencies.ninjawars]]
+    modId="forge"
+    mandatory=true
+    versionRange="[47,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.ninjawars]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.20.1,1.21)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.ninjawars]]
+    modId="narutoto"
+    mandatory=false
+    versionRange="[0.4,)"
+    ordering="AFTER"
+    side="BOTH"
