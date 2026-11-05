@@ -58,12 +58,14 @@ public class NinjaWars {
     public static class GameEvents {
 
         /**
-         * Detecta automaticamente as estruturas reais de Konoha,
-         * Suna e Kumo do mod Narutoto.
+         * Detecta automaticamente as estruturas reais
+         * de Konoha, Suna e Kumo do mod Narutoto.
          */
         @SubscribeEvent
         public void villageChunk(ChunkEvent.Load event) {
-            if (!(event.getLevel() instanceof ServerLevel level)) return;
+            if (!(event.getLevel() instanceof ServerLevel level)) {
+                return;
+            }
 
             var chunk = event.getChunk();
             WarData data = WarData.get(level);
@@ -96,13 +98,26 @@ public class NinjaWars {
                 int x = (box.minX() + box.maxX()) / 2;
                 int z = (box.minZ() + box.maxZ()) / 2;
 
-                int y = level.getHeight(
-                        net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                        x,
-                        z
+                /*
+                 * CORREÇÃO DO CONGELAMENTO:
+                 *
+                 * Não usar level.getHeight() durante ChunkEvent.Load.
+                 *
+                 * O centro da estrutura pode estar em outro chunk
+                 * ainda descarregado. Consultar a altura nesse momento
+                 * pode provocar carregamentos encadeados de chunks.
+                 *
+                 * Usamos minY apenas como posição de referência.
+                 * A altura real será calculada posteriormente,
+                 * quando for necessário criar NPCs ou teleportar.
+                 */
+                int y = box.minY();
+
+                data.centers.put(
+                        village,
+                        new BlockPos(x, y, z)
                 );
 
-                data.centers.put(village, new BlockPos(x, y, z));
                 data.areas.put(village, box);
                 data.setDirty();
             }
@@ -115,8 +130,13 @@ public class NinjaWars {
 
         @SubscribeEvent
         public void tick(TickEvent.ServerTickEvent e) {
-            if (e.phase != TickEvent.Phase.END) return;
-            if (e.getServer().getTickCount() % 200 != 0) return;
+            if (e.phase != TickEvent.Phase.END) {
+                return;
+            }
+
+            if (e.getServer().getTickCount() % 200 != 0) {
+                return;
+            }
 
             WarManager.tick(e.getServer().overworld());
         }
@@ -130,7 +150,9 @@ public class NinjaWars {
 
             var id = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
 
-            if (id == null || !"narutoto".equals(id.getNamespace())) return;
+            if (id == null || !"narutoto".equals(id.getNamespace())) {
+                return;
+            }
 
             String path = id.getPath();
 
@@ -176,9 +198,17 @@ public class NinjaWars {
          */
         @SubscribeEvent
         public void board(PlayerInteractEvent.RightClickBlock e) {
-            if (e.getHand() != InteractionHand.MAIN_HAND) return;
-            if (!(e.getEntity() instanceof ServerPlayer p)) return;
-            if (!e.getLevel().getBlockState(e.getPos()).is(Blocks.LECTERN)) return;
+            if (e.getHand() != InteractionHand.MAIN_HAND) {
+                return;
+            }
+
+            if (!(e.getEntity() instanceof ServerPlayer p)) {
+                return;
+            }
+
+            if (!e.getLevel().getBlockState(e.getPos()).is(Blocks.LECTERN)) {
+                return;
+            }
 
             WarData d = WarData.get((ServerLevel) e.getLevel());
 
@@ -194,7 +224,8 @@ public class NinjaWars {
                         p.sendSystemMessage(
                                 net.minecraft.network.chat.Component.literal(
                                         "§aVocê se juntou a "
-                                                + en.getKey().display + "!"
+                                                + en.getKey().display
+                                                + "!"
                                 )
                         );
                     }
