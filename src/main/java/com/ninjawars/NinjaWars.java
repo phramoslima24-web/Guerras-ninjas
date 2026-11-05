@@ -10,7 +10,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.level.ChunkEvent;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
@@ -52,7 +51,7 @@ public class NinjaWars {
             var chunk = event.getChunk();
             WarData data = WarData.get(level);
             for (var entry : chunk.getAllStarts().entrySet()) {
-                String id = String.valueOf(BuiltInRegistries.STRUCTURE.getKey(entry.getKey()));
+                String id = String.valueOf(ForgeRegistries.STRUCTURE_FEATURES.getKey(entry.getKey()));
                 Village village = switch (id) {
                     case "narutoto:konoha_village" -> Village.KONOHA;
                     case "narutoto:suna_village" -> Village.SUNA;
