@@ -9,6 +9,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.registries.ForgeRegistries;
 
@@ -17,9 +20,10 @@ import java.util.Iterator;
 import java.util.List;
 
 public final class WarManager {
-    private static final int[] GARRISON = {4, 3, 2, 1, 1, 0, 0, 0};
+    private static final int[] GARRISON = {3, 2, 2, 1, 1, 0, 0, 0};
     private static final String VILLAGE_TAG = "ninjawars.village.";
     private static final String INVADER_TAG = "ninjawars.invader";
+    private static final String LEADER_TAG = "ninjawars.leader";
     private WarManager() {}
 
     public static void broadcast(ServerLevel l, String msg) {
@@ -45,6 +49,7 @@ public final class WarManager {
         return l.getEntitiesOfClass(Mob.class, new AABB(center).inflate(radius),
                 mob -> mob.isAlive()
                         && mob.getTags().contains(VILLAGE_TAG + village.id)
+                        && !mob.getTags().contains(LEADER_TAG)
                         && mob.getTags().contains(INVADER_TAG) == invader);
     }
 
@@ -65,6 +70,7 @@ public final class WarManager {
         BlockPos probe = new BlockPos(x, level.getMinBuildHeight(), z);
         if (!level.hasChunkAt(probe)) return null;
 
+        if (WarData.get(level).destroyed.contains(village)) return null;
         ResourceLocation id = new ResourceLocation("narutoto", entityId(village, rank));
         var type = ForgeRegistries.ENTITY_TYPES.getValue(id);
         if (type == null) {
@@ -87,10 +93,52 @@ public final class WarManager {
         return mob;
     }
 
+    /** Cria os líderes únicos usando as entidades de personagem já incluídas no Narutoto. */
+    public static void spawnLeader(ServerLevel level, Village village, BlockPos center) {
+        WarData data = WarData.get(level);
+        if (data.destroyed.contains(village) || data.leadersSpawned.contains(village)) return;
+        String id = switch (village) {
+            case KONOHA -> "minato_npc";
+            case SUNA -> "gaara_npc";
+            case KUMO -> "kumo_jonin";
+            default -> null;
+        };
+        if (id == null) return;
+        var type = ForgeRegistries.ENTITY_TYPES.getValue(new ResourceLocation("narutoto", id));
+        if (type == null) {
+            broadcast(level, "§c[Ninja Wars] Não foi possível encontrar o líder " + id + " no Narutoto.");
+            return;
+        }
+        int x = center.getX(), z = center.getZ();
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        Entity created = type.create(level);
+        if (!(created instanceof Mob leader)) return;
+        leader.moveTo(x + 0.5, y, z + 0.5, level.random.nextFloat() * 360f, 0f);
+        leader.addTag(VILLAGE_TAG + village.id);
+        leader.addTag(LEADER_TAG);
+        int rank = village == Village.KUMO ? 2 : 4;
+        leader.addTag("ninjawars.rank." + rank);
+        leader.setPersistenceRequired();
+        leader.setCustomName(Component.literal(switch (village) {
+            case KONOHA -> "Minato — Hokage";
+            case SUNA -> "Gaara — Kazekage";
+            case KUMO -> "Jōnin líder de Kumo";
+            default -> "Líder de " + village.display;
+        }));
+        leader.setCustomNameVisible(true);
+        if (level.addFreshEntity(leader)) {
+            data.leadersSpawned.add(village);
+            data.setDirty();
+        }
+    }
+
     private static boolean isEnemyOf(Mob mob, LivingEntity candidate, WarData data) {
         Village ownVillage = taggedVillage(mob);
-        if (ownVillage == null || candidate == mob || !candidate.isAlive()) return false;
+        if (ownVillage == null || candidate == mob || !candidate.isAlive()
+                || candidate.getTags().contains(LEADER_TAG)) return false;
 
+        // Konoha é neutra em relação a jogadores: seus ninjas não escolhem jogadores como alvo.
+        if (ownVillage == Village.KONOHA && candidate instanceof ServerPlayer) return false;
         Village otherVillage = candidate instanceof ServerPlayer player
                 ? PlayerData.village(player) : taggedVillage(candidate);
         return otherVillage != null && otherVillage != ownVillage
@@ -100,7 +148,7 @@ public final class WarManager {
     private static void directArmies(ServerLevel level, WarData data, WarData.War war, BlockPos battleCenter) {
         AABB area = new AABB(battleCenter).inflate(100);
         List<Mob> warriors = level.getEntitiesOfClass(Mob.class, area,
-                mob -> mob.isAlive() && taggedVillage(mob) != null);
+                mob -> mob.isAlive() && taggedVillage(mob) != null && !mob.getTags().contains(LEADER_TAG));
         List<LivingEntity> possibleTargets = level.getEntitiesOfClass(LivingEntity.class, area,
                 LivingEntity::isAlive);
 
@@ -125,14 +173,69 @@ public final class WarManager {
         }
     }
 
+    private static boolean naturalBlock(net.minecraft.world.level.block.state.BlockState state) {
+        return state.isAir() || state.is(BlockTags.DIRT) || state.is(BlockTags.LOGS)
+                || state.is(BlockTags.LEAVES) || state.is(BlockTags.BASE_STONE_OVERWORLD)
+                || state.is(BlockTags.SAND) || state.is(Blocks.GRAVEL) || state.is(Blocks.WATER)
+                || state.is(Blocks.LAVA) || state.is(Blocks.BEDROCK) || state.is(Blocks.CLAY)
+                || state.is(Blocks.SNOW_BLOCK) || state.is(Blocks.ICE) || state.is(Blocks.PACKED_ICE)
+                || state.is(Blocks.BLUE_ICE) || state.is(Blocks.MOSS_BLOCK);
+    }
+
+    /** Só declara a vila destruída quando todos os chunks da estrutura estão carregados
+     * e não resta nenhum bloco de construção dentro dos limites originais do Narutoto. */
+    private static void checkDestroyed(ServerLevel level, WarData data) {
+        for (var entry : data.areas.entrySet()) {
+            Village village = entry.getKey();
+            if (data.destroyed.contains(village)) continue;
+            BoundingBox box = entry.getValue();
+            boolean allLoaded = true;
+            for (int x = box.minX() >> 4; x <= box.maxX() >> 4 && allLoaded; x++) {
+                for (int z = box.minZ() >> 4; z <= box.maxZ() >> 4; z++) {
+                    if (!level.hasChunkAt(new BlockPos((x << 4) + 8, box.minY(), (z << 4) + 8))) {
+                        allLoaded = false; break;
+                    }
+                }
+            }
+            if (!allLoaded) continue;
+            int remaining = 0;
+            scan: for (int x = box.minX(); x <= box.maxX(); x++) {
+                for (int y = box.minY(); y <= box.maxY(); y++) {
+                    for (int z = box.minZ(); z <= box.maxZ(); z++) {
+                        if (!naturalBlock(level.getBlockState(new BlockPos(x, y, z)))) {
+                            remaining++;
+                            if (remaining > 0) break scan;
+                        }
+                    }
+                }
+            }
+            if (remaining == 0) {
+                data.destroyed.add(village);
+                data.wars.removeIf(w -> w.atk == village || w.def == village);
+                BlockPos center = data.centers.remove(village);
+                if (center != null) {
+                    removeVillageWarriors(level, village, center, 200);
+                    for (Mob mob : level.getEntitiesOfClass(Mob.class, new AABB(center).inflate(200),
+                            m -> m.getTags().contains(VILLAGE_TAG + village.id) && m.getTags().contains(LEADER_TAG))) mob.discard();
+                }
+                data.setDirty();
+                broadcast(level, "§4§l[Ninja Wars] " + village.display + " foi completamente destruída! Não nascerão mais ninjas nessa vila.");
+            }
+        }
+    }
+
     public static void tick(ServerLevel level) {
         WarData data = WarData.get(level);
+        if (level.getGameTime() % 6000 == 0) checkDestroyed(level, data);
+        for (var entry : data.centers.entrySet()) {
+            if (active(level, entry.getValue())) spawnLeader(level, entry.getKey(), entry.getValue());
+        }
 
         // Reforços das vilas: usa Genin, Chunin, Jonin e ANBU reais do Narutoto.
         for (var entry : data.centers.entrySet()) {
             Village village = entry.getKey();
             BlockPos center = entry.getValue();
-            if (!active(level, center)) continue;
+            if (data.destroyed.contains(village) || !active(level, center)) continue;
 
             int[] have = new int[5], want = new int[5];
             for (Mob mob : ninjas(level, center, 60, village, false)) {
@@ -146,6 +249,8 @@ public final class WarManager {
                 have[rank]++;
             }
             for (int rank : GARRISON) want[rank]++;
+            // O único Jōnin de Kumo é o líder especial criado acima.
+            if (village == Village.KUMO) { want[2] = 0; want[3] = 0; }
             for (int rank = 0; rank < 5; rank++) {
                 for (int i = have[rank]; i < want[rank]; i++) {
                     Mob mob = spawn(level, village, rank,
@@ -156,14 +261,7 @@ public final class WarManager {
             }
         }
 
-        // Diplomacia automática: chance periódica, limitada a duas guerras simultâneas.
-        if (level.getGameTime() % 6000 < 200 && data.wars.size() < 2
-                && data.centers.size() >= 2 && level.random.nextFloat() < 0.25f) {
-            List<Village> villages = new ArrayList<>(data.centers.keySet());
-            Village a = villages.get(level.random.nextInt(villages.size()));
-            Village b = villages.get(level.random.nextInt(villages.size()));
-            if (data.declare(a, b)) broadcast(level, "§c§l[Guerra] §r§c" + a.display + " declarou guerra contra " + b.display + "!");
-        }
+        // Guerras só começam por comando explícito do administrador.
 
         Iterator<WarData.War> iterator = data.wars.iterator();
         while (iterator.hasNext()) {
@@ -220,7 +318,10 @@ public final class WarManager {
     }
 
     private static void spawnWave(ServerLevel level, WarData.War war, BlockPos defenderCenter) {
-        int[] composition = {2, 1, 1, 0, 0, 0};
+        // Kumo mantém apenas o Jōnin líder; suas ondas usam Chunin e Genin.
+        int[] composition = war.atk == Village.KUMO
+                ? new int[]{1, 1, 1, 0, 0, 0}
+                : new int[]{2, 1, 1, 0, 0, 0};
         int spawned = 0;
         for (int rank : composition) {
             double angle = level.random.nextDouble() * Math.PI * 2;

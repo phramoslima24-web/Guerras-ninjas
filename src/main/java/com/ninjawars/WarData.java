@@ -1,6 +1,7 @@
 package com.ninjawars;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
@@ -22,6 +23,9 @@ public class WarData extends SavedData {
     }
 
     public final Map<Village, BlockPos> centers = new EnumMap<>(Village.class);
+    public final Map<Village, BoundingBox> areas = new EnumMap<>(Village.class);
+    public final java.util.Set<Village> destroyed = java.util.EnumSet.noneOf(Village.class);
+    public final java.util.Set<Village> leadersSpawned = java.util.EnumSet.noneOf(Village.class);
     public final List<War> wars = new ArrayList<>();
 
     public static WarData get(ServerLevel level) {
@@ -35,7 +39,7 @@ public class WarData extends SavedData {
     }
 
     public boolean declare(Village atk, Village def) {
-        if (atk == def || atWar(atk, def) || !centers.containsKey(atk) || !centers.containsKey(def)) return false;
+        if (atk == def || destroyed.contains(atk) || destroyed.contains(def) || atWar(atk, def) || !centers.containsKey(atk) || !centers.containsKey(def)) return false;
         wars.add(new War(atk, def));
         setDirty();
         return true;
@@ -47,6 +51,18 @@ public class WarData extends SavedData {
             CompoundTag c = (CompoundTag) t;
             Village v = Village.byId(c.getString("v"));
             if (v != null) d.centers.put(v, NbtUtils.readBlockPos(c.getCompound("pos")));
+        }
+        for (Tag t : tag.getList("areas", 10)) {
+            CompoundTag c = (CompoundTag) t;
+            Village v = Village.byId(c.getString("v"));
+            if (v != null) d.areas.put(v, new BoundingBox(c.getInt("minX"), c.getInt("minY"), c.getInt("minZ"),
+                    c.getInt("maxX"), c.getInt("maxY"), c.getInt("maxZ")));
+        }
+        for (Tag t : tag.getList("destroyed", 8)) {
+            Village v = Village.byId(t.getAsString()); if (v != null) d.destroyed.add(v);
+        }
+        for (Tag t : tag.getList("leaders", 8)) {
+            Village v = Village.byId(t.getAsString()); if (v != null) d.leadersSpawned.add(v);
         }
         for (Tag t : tag.getList("wars", 10)) {
             CompoundTag c = (CompoundTag) t;
@@ -70,6 +86,17 @@ public class WarData extends SavedData {
             cl.add(c);
         });
         tag.put("centers", cl);
+        ListTag al = new ListTag();
+        areas.forEach((v, b) -> {
+            CompoundTag c = new CompoundTag(); c.putString("v", v.id);
+            c.putInt("minX", b.minX()); c.putInt("minY", b.minY()); c.putInt("minZ", b.minZ());
+            c.putInt("maxX", b.maxX()); c.putInt("maxY", b.maxY()); c.putInt("maxZ", b.maxZ()); al.add(c);
+        });
+        tag.put("areas", al);
+        ListTag dl = new ListTag(); for (Village v : destroyed) dl.add(net.minecraft.nbt.StringTag.valueOf(v.id));
+        tag.put("destroyed", dl);
+        ListTag ll = new ListTag(); for (Village v : leadersSpawned) ll.add(net.minecraft.nbt.StringTag.valueOf(v.id));
+        tag.put("leaders", ll);
         ListTag wl = new ListTag();
         for (War w : wars) {
             CompoundTag c = new CompoundTag();

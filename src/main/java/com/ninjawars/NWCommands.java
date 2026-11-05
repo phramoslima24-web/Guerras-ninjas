@@ -40,6 +40,7 @@ public final class NWCommands {
         d.register(Commands.literal("ninjawars")
                 .then(Commands.literal("list").executes(NWCommands::list))
                 .then(Commands.literal("status").executes(NWCommands::status))
+                .then(Commands.literal("participar").executes(NWCommands::participate))
                 .then(Commands.literal("mission").executes(c -> { Missions.giveOrShow(c.getSource().getPlayerOrException()); return 1; }))
                 .then(Commands.literal("join").then(vArg("village").executes(NWCommands::join)))
                 .then(Commands.literal("village").requires(s -> s.hasPermission(2))
@@ -54,13 +55,41 @@ public final class NWCommands {
                         .then(vArg("village").then(Commands.argument("rank", IntegerArgumentType.integer(0, 4)).executes(NWCommands::spawn)))));
     }
 
+
+    private static int participate(CommandContext<CommandSourceStack> c) throws CommandSyntaxException {
+        ServerPlayer player = c.getSource().getPlayerOrException();
+        ServerLevel level = c.getSource().getServer().overworld();
+        WarData data = WarData.get(level);
+        Village own = PlayerData.village(player);
+        WarData.War selected = null;
+        if (own != null) {
+            for (WarData.War war : data.wars) {
+                if (war.atk == own || war.def == own) { selected = war; break; }
+            }
+        }
+        if (selected == null && !data.wars.isEmpty()) selected = data.wars.get(0);
+        if (selected != null) {
+            WarData.War war = selected;
+            BlockPos battle = data.centers.get(war.def);
+            if (battle != null) {
+                int x = battle.getX(), z = battle.getZ();
+                int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+                player.teleportTo(level, x + 0.5, y + 1.0, z + 0.5, player.getYRot(), player.getXRot());
+                msg(c, "§aVocê foi levado ao campo de batalha: " + war.atk.display + " contra " + war.def.display + "!");
+                return 1;
+            }
+        }
+        msg(c, "§eNão existe guerra ativa para participar. Peça a um administrador para declarar uma guerra.");
+        return 0;
+    }
+
     private static int list(CommandContext<CommandSourceStack> c) {
         WarData d = WarData.get(c.getSource().getLevel());
         StringBuilder sb = new StringBuilder("§6== Vilas ==");
         for (Village v : Village.values()) {
             BlockPos p = d.centers.get(v);
             sb.append("\n§e").append(v.display).append(" §7(").append(v.kageTitle).append(") ")
-              .append(p == null ? "§8não fundada" : "§f" + p.getX() + " " + p.getY() + " " + p.getZ());
+              .append(d.destroyed.contains(v) ? "§cdestruída" : p == null ? "§8aguardando estrutura" : "§f" + p.getX() + " " + p.getY() + " " + p.getZ());
         }
         sb.append("\n§c== Guerras ==");
         if (d.wars.isEmpty()) sb.append("\n§aNenhuma");
@@ -82,6 +111,7 @@ public final class NWCommands {
     private static int join(CommandContext<CommandSourceStack> c) throws CommandSyntaxException {
         ServerPlayer p = c.getSource().getPlayerOrException();
         Village v = v(c, "village");
+        if (WarData.get(c.getSource().getServer().overworld()).destroyed.contains(v)) { msg(c, "§cEssa vila foi destruída neste mundo."); return 0; }
         PlayerData.setVillage(p, v);
         msg(c, "§aVocê agora é ninja de " + v.display + ".");
         return 1;
@@ -95,6 +125,7 @@ public final class NWCommands {
         BlockPos position = player.blockPosition();
 
         WarData data = WarData.get(level);
+        if (data.destroyed.contains(village)) { msg(c, "§cEssa vila foi marcada como destruída e não pode ser reativada neste mundo."); return 0; }
         data.centers.put(village, position);
         data.setDirty();
 
