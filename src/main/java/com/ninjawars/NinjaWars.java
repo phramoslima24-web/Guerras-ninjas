@@ -1,9 +1,8 @@
 
 package com.ninjawars;
 
-import net.minecraft.core.registries.Registries;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -11,6 +10,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
+
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.level.ChunkEvent;
@@ -57,7 +57,10 @@ public class NinjaWars {
 
     public static class GameEvents {
 
-        /** Detecta automaticamente as estruturas reais de Konoha, Suna e Kumo do Narutoto. */
+        /**
+         * Detecta automaticamente as estruturas reais de Konoha,
+         * Suna e Kumo do mod Narutoto.
+         */
         @SubscribeEvent
         public void villageChunk(ChunkEvent.Load event) {
             if (!(event.getLevel() instanceof ServerLevel level)) return;
@@ -65,11 +68,13 @@ public class NinjaWars {
             var chunk = event.getChunk();
             WarData data = WarData.get(level);
 
+            var structureRegistry = level.registryAccess()
+                    .registryOrThrow(Registries.STRUCTURE);
+
             for (var entry : chunk.getAllStarts().entrySet()) {
 
-                // CORREÇÃO: utiliza o registro de estruturas do Minecraft.
                 String id = String.valueOf(
-                        BuiltInRegistries.STRUCTURE.getKey(entry.getKey())
+                        structureRegistry.getKey(entry.getKey())
                 );
 
                 Village village = switch (id) {
@@ -81,7 +86,9 @@ public class NinjaWars {
 
                 if (village == null
                         || data.destroyed.contains(village)
-                        || data.centers.containsKey(village)) continue;
+                        || data.centers.containsKey(village)) {
+                    continue;
+                }
 
                 StructureStart start = entry.getValue();
                 var box = start.getBoundingBox();
@@ -114,10 +121,13 @@ public class NinjaWars {
             WarManager.tick(e.getServer().overworld());
         }
 
-        /** Bloqueia cópias dos líderes gerados naturalmente pelo Narutoto. */
+        /**
+         * Bloqueia cópias dos líderes gerados naturalmente pelo Narutoto.
+         */
         @SubscribeEvent
         public void uniqueVillageLeaders(EntityJoinLevelEvent event) {
             var entity = event.getEntity();
+
             var id = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
 
             if (id == null || !"narutoto".equals(id.getNamespace())) return;
@@ -161,7 +171,9 @@ public class NinjaWars {
             }
         }
 
-        /** Atril dentro de uma vila = quadro de missões. */
+        /**
+         * Atril dentro de uma vila = quadro de missões.
+         */
         @SubscribeEvent
         public void board(PlayerInteractEvent.RightClickBlock e) {
             if (e.getHand() != InteractionHand.MAIN_HAND) return;
@@ -181,7 +193,8 @@ public class NinjaWars {
 
                         p.sendSystemMessage(
                                 net.minecraft.network.chat.Component.literal(
-                                        "§aVocê se juntou a " + en.getKey().display + "!"
+                                        "§aVocê se juntou a "
+                                                + en.getKey().display + "!"
                                 )
                         );
                     }
