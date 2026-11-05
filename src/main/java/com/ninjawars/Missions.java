@@ -41,8 +41,9 @@ public final class Missions {
         Village pv = PlayerData.village(p);
         boolean counts;
         if (type == 1) {
-            counts = victim instanceof NinjaEntity n && pv != null && n.getVillage() != pv
-                    && WarData.get((ServerLevel) p.level()).atWar(pv, n.getVillage());
+            Village victimVillage = WarManager.taggedVillage(victim);
+            counts = victimVillage != null && pv != null && victimVillage != pv
+                    && WarData.get((ServerLevel) p.level()).atWar(pv, victimVillage);
         } else {
             counts = victim instanceof Monster;
         }

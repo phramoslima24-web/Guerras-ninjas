@@ -7,7 +7,8 @@ Addon de guerras entre as cinco grandes vilas ninja para **Minecraft 1.20.1 + Mi
 ## Recursos
 
 - Cinco vilas: Konoha, Suna, Kiri, Kumo e Iwa.
-- Fundação de vilas com muralhas, casas, quartel e quadro de missões.
+- Integração com as vilas geradas pelo Narutoto: registre o centro de cada vila existente, sem construir uma cidade substituta.
+- Exércitos compostos pelas entidades reais Genin, Chunin, Jonin e ANBU do Narutoto.
 - Guarnições de ninjas com cinco níveis de rank.
 - Sistema de guerras com ondas de invasores, vitória, derrota e trégua.
 - Jutsus temáticos para cada vila.
@@ -20,7 +21,7 @@ Addon de guerras entre as cinco grandes vilas ninja para **Minecraft 1.20.1 + Mi
 - Minecraft Forge **47.2.0** (linha Forge 47).
 - JDK **17**.
 - Gradle compatível com o plugin ForgeGradle 6.
-- Narutoto 0.4.x é declarado como dependência opcional nos metadados; confirme a compatibilidade com a versão instalada.
+- Narutoto **0.4.1 ou superior compatível com Forge 47** é dependência obrigatória.
 
 ## Como compilar
 
@@ -54,13 +55,31 @@ Copie o `.jar` gerado para a pasta `mods` da instalação Minecraft Forge 1.20.1
 | `/ninjawars status` | Todos | Mostra vila, rank e XP do jogador |
 | `/ninjawars join <vila>` | Todos | Entra para uma vila |
 | `/ninjawars mission` | Todos | Aceita ou consulta uma missão |
-| `/ninjawars village create <vila>` | OP (nível 2) | Funda uma vila na posição do jogador |
+| `/ninjawars village set <vila>` | OP (nível 2) | Registra a posição central de uma vila do Narutoto |
 | `/ninjawars village remove <vila>` | OP (nível 2) | Remove a vila do registro; os blocos permanecem |
 | `/ninjawars war declare <atacante> <defensor>` | OP (nível 2) | Declara guerra entre duas vilas fundadas |
 | `/ninjawars war peace <vila1> <vila2>` | OP (nível 2) | Encerra a guerra |
-| `/ninjawars spawn <vila> <rank>` | OP (nível 2) | Cria um ninja para testes; rank de 0 a 4 |
+| `/ninjawars spawn <vila> <rank>` | OP (nível 2) | Cria um ninja real do Narutoto para testes; rank de 0 a 4 |
 
 Vilas aceitas: `konoha`, `suna`, `kiri`, `kumo` e `iwa`.
+
+### Usar as vilas do Narutoto
+
+1. Localize uma vila do Narutoto. Nesta versão, os arquivos de geração de estruturas incluem Konoha, Suna e Kumo:
+   - `/locate structure narutoto:konoha_village`
+   - `/locate structure narutoto:suna_village`
+   - `/locate structure narutoto:kumo_village`
+2. Vá até o centro da vila encontrada e registre-a:
+   - `/ninjawars village set konoha` (ou `suna` / `kumo`)
+3. Repita para cada vila que participará da guerra.
+4. Para Kiri e Iwa, o Narutoto 0.4.1 tem ninjas e equipamentos, mas não inclui estruturas de vila na geração de mundo; registre manualmente o centro de uma base que você construir ou escolher.
+5. Declare a guerra: `/ninjawars war declare konoha suna`.
+
+O comando antigo `/ninjawars village create <vila>` continua aceito como alias, mas agora apenas registra a posição do jogador: não constrói casas ou muralhas.
+
+### Exércitos do Narutoto
+
+O Ninja Wars cria as entidades registradas pelo Narutoto (`*_genin`, `*_chunin`, `*_jonin`; Konoha também usa `konoha_anbu`). Como o Narutoto 0.4.1 não possui uma entidade Kage, o rank Kage usa o modelo/entidade Jonin. O addon direciona os ninjas aliados para atacar soldados da vila inimiga durante uma guerra.
 
 ## Estrutura
 
@@ -84,8 +103,8 @@ Vilas aceitas: `konoha`, `suna`, `kiri`, `kumo` e `iwa`.
 
 ## Limitações conhecidas
 
-- As skins de Konoha, Suna, Kiri, Kumo e Iwa são referenciadas do namespace `narutoto` (Narutoto 0.4.1). O mod usa Steve como fallback se a textura não estiver disponível.
-- Para exibir as skins, instale o Narutoto 0.4.1 Forge junto com este addon.
+- O sistema de guerra agora usa entidades reais do Narutoto 0.4.1, não apenas skins aplicadas ao NPC genérico do Ninja Wars.
+- Kiri e Iwa não possuem estruturas de vila na geração de mundo desta versão do Narutoto; seus ninjas estão disponíveis normalmente.
 - O projeto não foi compilado nem testado em jogo nesta preparação.
 - O equilíbrio das guerras, a navegação dos invasores e a compatibilidade com outros mods precisam de testes em servidor e cliente.
 

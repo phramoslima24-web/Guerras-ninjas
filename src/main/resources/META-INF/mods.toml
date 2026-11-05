@@ -25,7 +25,7 @@ description='''Guerras ninja entre as 5 grandes vilas: guarnições, invasões, 
 
 [[dependencies.ninjawars]]
     modId="narutoto"
-    mandatory=false
-    versionRange="[0.4,)"
+    mandatory=true
+    versionRange="[0.4.1,)"
     ordering="AFTER"
     side="BOTH"
