@@ -92,3 +92,15 @@ Vilas aceitas: `konoha`, `suna`, `kiri`, `kumo` e `iwa`.
 ## Licença
 
 Este projeto está sob a licença MIT. Consulte [`LICENSE`](LICENSE).
+
+## Compilação automática pelo GitHub Actions
+
+O workflow em `.github/workflows/build.yml` compila o mod automaticamente em pushes para `main`/`master`, em Pull Requests e quando iniciado manualmente.
+
+Para baixar o JAR:
+1. Abra a aba **Actions** do repositório.
+2. Selecione a execução mais recente de **Build Ninja Wars**.
+3. Aguarde o job terminar com sucesso.
+4. Baixe o artefato `ninjawars-minecraft-1.20.1` na seção **Artifacts**.
+
+O workflow usa Temurin Java 17 e Gradle 8.8. O JAR é produzido em `build/libs/` e disponibilizado como artefato por 14 dias.
